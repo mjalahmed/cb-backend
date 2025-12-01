@@ -33,6 +33,21 @@ export const authenticate = (
   }
 };
 
+export const requirePhoneVerified = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  // This will need to check the database for phone verification status
+  // For now, we'll let it pass and check in routes that need it
+  next();
+};
+
 export const requireAdmin = (
   req: Request,
   res: Response,

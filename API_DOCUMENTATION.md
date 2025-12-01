@@ -36,7 +36,13 @@ Authorization: Bearer <your-jwt-token>
 
 ### Token Format
 
-After successful OTP verification, you'll receive a JWT token that should be stored and sent with each authenticated request.
+After successful login, you'll receive a JWT token that should be stored and sent with each authenticated request.
+
+### Authentication Flow
+
+1. **Register** - Create account with username, password, and phone number
+2. **Verify Phone** - Verify phone number with OTP sent during registration
+3. **Login** - Authenticate with username and password to get JWT token
 
 ---
 
@@ -44,9 +50,102 @@ After successful OTP verification, you'll receive a JWT token that should be sto
 
 ### 1. Authentication Routes
 
+#### POST `/api/v1/auth/register`
+
+Register a new user account.
+
+**Access:** Public
+
+**Request Body:**
+```json
+{
+  "username": "johndoe",
+  "email": "john@example.com",
+  "password": "securepassword123",
+  "phoneNumber": "+1234567890"
+}
+```
+
+**Fields:**
+- `username` (required): 3-30 characters, alphanumeric and underscores only
+- `email` (optional): Valid email format
+- `password` (required): Minimum 6 characters
+- `phoneNumber` (required): E.164 format phone number
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "User registered successfully. Please verify your phone number.",
+  "user": {
+    "id": "uuid",
+    "username": "johndoe",
+    "email": "john@example.com",
+    "phoneNumber": "+1234567890",
+    "phoneVerified": false,
+    "role": "CUSTOMER"
+  }
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "errors": [
+    {
+      "msg": "Username already taken",
+      "param": "username"
+    }
+  ]
+}
+```
+
+**Note:** An OTP is automatically sent to the provided phone number after registration.
+
+---
+
+#### POST `/api/v1/auth/login`
+
+Login with username and password.
+
+**Access:** Public
+
+**Request Body:**
+```json
+{
+  "username": "johndoe",
+  "password": "securepassword123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "uuid",
+    "username": "johndoe",
+    "email": "john@example.com",
+    "phoneNumber": "+1234567890",
+    "phoneVerified": true,
+    "role": "CUSTOMER"
+  }
+}
+```
+
+**Error Response (401):**
+```json
+{
+  "error": "Invalid username or password"
+}
+```
+
+---
+
 #### POST `/api/v1/auth/send-otp`
 
-Send OTP to phone number via SMS.
+Send OTP to phone number for verification.
 
 **Access:** Public
 
@@ -65,23 +164,20 @@ Send OTP to phone number via SMS.
 }
 ```
 
-**Error Response (400):**
+**Error Response (404):**
 ```json
 {
-  "errors": [
-    {
-      "msg": "Invalid phone number format",
-      "param": "phoneNumber"
-    }
-  ]
+  "error": "Phone number not found"
 }
 ```
 
+**Note:** Phone number must belong to an existing user account.
+
 ---
 
-#### POST `/api/v1/auth/verify-otp`
+#### POST `/api/v1/auth/verify-phone`
 
-Verify OTP and receive JWT token.
+Verify phone number with OTP code.
 
 **Access:** Public
 
@@ -97,10 +193,13 @@ Verify OTP and receive JWT token.
 ```json
 {
   "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "message": "Phone number verified successfully",
   "user": {
     "id": "uuid",
+    "username": "johndoe",
+    "email": "john@example.com",
     "phoneNumber": "+1234567890",
+    "phoneVerified": true,
     "role": "CUSTOMER"
   }
 }
@@ -518,7 +617,11 @@ Stripe webhook endpoint (handled automatically by Stripe).
 ```typescript
 {
   id: string (UUID)
-  phoneNumber: string (unique)
+  username: string (unique)
+  email: string | null (optional, unique)
+  password: string (hashed, not returned in API)
+  phoneNumber: string | null (optional, unique)
+  phoneVerified: boolean
   role: "CUSTOMER" | "ADMIN"
   createdAt: ISO 8601 date
   updatedAt: ISO 8601 date
@@ -693,24 +796,45 @@ api.interceptors.request.use((config) => {
 
 ## 🔄 Typical Frontend Flow
 
-### 1. User Authentication Flow
+### 1. User Registration & Authentication Flow
 
 ```javascript
-// 1. Send OTP
-const response = await fetch('http://localhost:3000/api/v1/auth/send-otp', {
+// 1. Register new user
+const registerResponse = await fetch('http://localhost:3000/api/v1/auth/register', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ phoneNumber: '+1234567890' })
+  body: JSON.stringify({
+    username: 'johndoe',
+    email: 'john@example.com',
+    password: 'securepassword123',
+    phoneNumber: '+1234567890'
+  })
 });
 
-// 2. Verify OTP
-const verifyResponse = await fetch('http://localhost:3000/api/v1/auth/verify-otp', {
+const { user } = await registerResponse.json();
+// OTP is automatically sent to phone number
+
+// 2. Verify phone number with OTP
+const verifyResponse = await fetch('http://localhost:3000/api/v1/auth/verify-phone', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ phoneNumber: '+1234567890', otp: '123456' })
+  body: JSON.stringify({
+    phoneNumber: '+1234567890',
+    otp: '123456'
+  })
 });
 
-const { token, user } = await verifyResponse.json();
+// 3. Login with username and password
+const loginResponse = await fetch('http://localhost:3000/api/v1/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    username: 'johndoe',
+    password: 'securepassword123'
+  })
+});
+
+const { token, user: loggedInUser } = await loginResponse.json();
 localStorage.setItem('token', token);
 ```
 
@@ -776,13 +900,17 @@ const { orders } = await ordersResponse.json();
 
 ## 📝 Notes
 
-1. **Phone Number Format:** Use E.164 format (e.g., `+1234567890`)
-2. **Price Format:** Prices are returned as strings to preserve decimal precision
-3. **UUID Format:** All IDs are UUIDs (v4)
-4. **Date Format:** All dates are ISO 8601 strings
-5. **OTP Expiry:** OTPs expire after 10 minutes
-6. **Token Expiry:** JWT tokens expire after 7 days (configurable)
-7. **Admin Access:** To create an admin user, authenticate via OTP first, then manually update the user's role to `ADMIN` in the database
+1. **Username Format:** 3-30 characters, alphanumeric and underscores only
+2. **Password Requirements:** Minimum 6 characters
+3. **Phone Number Format:** Use E.164 format (e.g., `+1234567890`)
+4. **Email Format:** Standard email format (optional during registration)
+5. **Price Format:** Prices are returned as strings to preserve decimal precision
+6. **UUID Format:** All IDs are UUIDs (v4)
+7. **Date Format:** All dates are ISO 8601 strings
+8. **OTP Expiry:** OTPs expire after 10 minutes
+9. **Token Expiry:** JWT tokens expire after 7 days (configurable)
+10. **Phone Verification:** Users can register and login without phone verification, but phone verification is recommended for order delivery
+11. **Admin Access:** To create an admin user, register normally, then manually update the user's role to `ADMIN` in the database
 
 ---
 

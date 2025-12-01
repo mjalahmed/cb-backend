@@ -35,12 +35,16 @@ enum PaymentStatus {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  phoneNumber String    @unique
-  role        UserRole  @default(CUSTOMER)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  orders      Order[]
+  id            String    @id @default(uuid())
+  username      String    @unique
+  email         String?   @unique
+  password      String    // Hashed password
+  phoneNumber   String?   @unique
+  phoneVerified Boolean   @default(false)
+  role          UserRole  @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  orders        Order[]
 
   @@map("users")
 }

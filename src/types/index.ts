@@ -2,7 +2,7 @@ import { UserRole, OrderStatus, OrderType } from '@prisma/client';
 
 export interface JWTPayload {
   userId: string;
-  phoneNumber: string;
+  username: string;
   role: UserRole;
 }
 
@@ -48,11 +48,23 @@ export interface CreatePaymentIntentRequest {
   amount: number;
 }
 
+export interface RegisterRequest {
+  username: string;
+  email?: string;
+  password: string;
+  phoneNumber: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
 export interface SendOTPRequest {
   phoneNumber: string;
 }
 
-export interface VerifyOTPRequest {
+export interface VerifyPhoneRequest {
   phoneNumber: string;
   otp: string;
 }

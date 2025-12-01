@@ -89,8 +89,10 @@ cb-backend/
 ## 🔌 API Endpoints
 
 ### Authentication
-- `POST /api/v1/auth/send-otp` - Send OTP to phone number
-- `POST /api/v1/auth/verify-otp` - Verify OTP and get JWT token
+- `POST /api/v1/auth/register` - Register new user (username, password, phone)
+- `POST /api/v1/auth/login` - Login with username and password
+- `POST /api/v1/auth/send-otp` - Send OTP to phone number for verification
+- `POST /api/v1/auth/verify-phone` - Verify phone number with OTP
 
 ### User
 - `GET /api/v1/user/me` - Get current user profile (Auth required)

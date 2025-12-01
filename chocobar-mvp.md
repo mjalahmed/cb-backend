@@ -24,7 +24,7 @@ Here is the complete **Chocobar MVP Project Canvas**, formatted for easy copying
 | **Frontend** | **Next.js (React)** | SSR for performance, speed, and better search indexing of the menu. |
 | **Backend API** | **Node.js (Express)** | Fast, scalable, unified JavaScript stack. |
 | **ORM/Database** | **Prisma** \+ **PostgreSQL** | Provides type safety, clean schema definition, and robust data integrity for transactions. |
-| **Authentication** | **Twilio** (SMS Gateway) | Required for OTP mobile number verification. |
+| **Authentication** | **Username/Password** + **Twilio** (SMS Gateway) | Username/password for login, OTP for phone number verification. |
 | **Authorization** | **JWT** (JSON Web Tokens) | Securely manages user sessions and defines Role (CUSTOMER/ADMIN). |
 | **Payment Gateway** | **Stripe** (Recommended) | Handles secure card payments and webhooks for payment confirmation. |
 
@@ -38,7 +38,9 @@ Here is the complete **Chocobar MVP Project Canvas**, formatted for easy copying
 | :---- | :---- | :---- |
 | **Menu Viewing** | Display **all Products** and Categories without requiring login. | ✅ |
 | **Local Cart** | Allow guests to add items and adjust quantity; data stored locally. | ✅ |
-| **OTP Login** | Modal triggered at Checkout; integrates with **Twilio**. Forces login before ordering. | ✅ |
+| **User Registration** | Username, password, email (optional), and phone number registration. | ✅ |
+| **User Login** | Username and password authentication with JWT tokens. | ✅ |
+| **Phone Verification** | OTP sent via Twilio after registration to verify phone number ownership. | ✅ |
 | **Mobile UX** | Fully responsive design prioritized for mobile devices. | ✅ |
 
 ### **B. Customer Ordering Flow**
@@ -60,8 +62,10 @@ Here is the complete **Chocobar MVP Project Canvas**, formatted for easy copying
 
 | Route | Method | Access | Function |
 | :---- | :---- | :---- | :---- |
-| /api/v1/auth/send-otp | POST | Public | Initiates Twilio SMS with OTP code. |
-| /api/v1/auth/verify-otp | POST | Public | Verifies OTP; returns JWT token and User object. |
+| /api/v1/auth/register | POST | Public | Creates new user account with username, password, email (optional), and phone number. Sends OTP for phone verification. |
+| /api/v1/auth/login | POST | Public | Authenticates user with username and password; returns JWT token and User object. |
+| /api/v1/auth/send-otp | POST | Public | Sends OTP to user's phone number for verification (requires existing account). |
+| /api/v1/auth/verify-phone | POST | Public | Verifies phone number with OTP code; updates phoneVerified status. |
 | /api/v1/user/me | GET | Auth | Retrieves the profile of the logged-in user. |
 
 ### **B. Menu & Products Routes (Public & Admin)**
@@ -91,7 +95,7 @@ This defines the structure of your PostgreSQL database, managed by Prisma.
 
 | Model | Key Fields | Relationships | Critical Notes |
 | :---- | :---- | :---- | :---- |
-| **User** | id, phoneNumber (Unique), role (Enum: CUSTOMER/ADMIN) | Order\[\] (one-to-many) | Core Auth model. |
+| **User** | id, username (Unique), email (Optional, Unique), password (Hashed), phoneNumber (Optional, Unique), phoneVerified (Boolean), role (Enum: CUSTOMER/ADMIN) | Order\[\] (one-to-many) | Core Auth model with username/password and phone verification. |
 | **Product** | id, name, price (Decimal/Money), isAvailable (Boolean) | Category (many-to-one), OrderItem\[\] | Menu items; requires price precision. |
 | **Order** | id, userId, totalAmount, status (Enum), orderType (Enum), scheduledTime | User, OrderItem\[\], Payment? (one-to-one) | Main transaction record. |
 | **OrderItem** | orderId, productId, quantity, priceAtOrder | Order, Product | Ensures price snapshot for historical accuracy. |

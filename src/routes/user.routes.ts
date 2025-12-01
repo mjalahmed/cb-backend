@@ -16,7 +16,10 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
       where: { id: req.user.userId },
       select: {
         id: true,
+        username: true,
+        email: true,
         phoneNumber: true,
+        phoneVerified: true,
         role: true,
         createdAt: true
       }
