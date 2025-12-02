@@ -31,6 +31,12 @@ TWILIO_PHONE_NUMBER=+1234567890
 # Stripe Configuration (for payments)
 STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# Supabase Configuration (for image uploads)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+# OR use anon key if preferred
+# SUPABASE_ANON_KEY=your_anon_key
 ```
 
 **Important:** Replace all placeholder values with your actual credentials.
