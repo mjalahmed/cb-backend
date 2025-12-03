@@ -38,7 +38,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature']
 }));
 
-// Request logging middleware (before other middleware)
+// Request logging middleware (before other middleware, but after CORS)
+// This will log all incoming requests to endpoints
 app.use(requestLogger);
 
 // Stripe webhook needs raw body, so mount it before JSON parser
@@ -66,7 +67,11 @@ app.use('/api/v1/payments', paymentRoutes);
 // Note: webhook route is mounted above with raw body parser
 
 // 404 handler
-app.use((_req: Request, res: Response) => {
+app.use((req: Request, res: Response) => {
+  logger.warn(`⚠️  404 - Route not found: ${req.method} ${req.originalUrl || req.path}`, {
+    ip: req.ip || req.socket.remoteAddress,
+    userAgent: req.get('user-agent')
+  });
   res.status(404).json({ error: 'Route not found' });
 });
 
