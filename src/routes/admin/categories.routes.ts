@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticate, requireAdmin } from '../../middleware/auth.middleware.js';
 import { prisma } from '../../index.js';
 import { Prisma } from '@prisma/client';
+import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -27,9 +28,13 @@ router.post('/',
         }
       });
 
+      logger.debug('Categories retrieved', { count: categories.length });
       res.json({ categories });
     } catch (error) {
-      console.error('Get categories error:', error);
+      logger.error('Get categories error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to retrieve categories' });
     }
   }
@@ -41,14 +46,13 @@ router.post('/get',
     body('id').isUUID().withMessage('Invalid category ID')
   ],
   async (req: Request<{}, {}, { id: string }>, res: Response) => {
+    const { id } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { id } = req.body;
 
       const category = await prisma.category.findUnique({
         where: { id },
@@ -75,9 +79,14 @@ router.post('/get',
         return;
       }
 
+      logger.debug('Category retrieved', { categoryId: id });
       res.json({ category });
     } catch (error) {
-      console.error('Get category error:', error);
+      logger.error('Get category error', {
+        categoryId: id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to retrieve category' });
     }
   }
@@ -90,14 +99,13 @@ router.post('/create',
     body('description').optional().isString()
   ],
   async (req: Request<{}, {}, { name: string; description?: string }>, res: Response) => {
+    const { name, description } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { name, description } = req.body;
 
       // Check if category with same name already exists
       const existing = await prisma.category.findFirst({
@@ -116,9 +124,18 @@ router.post('/create',
         }
       });
 
+      logger.info('Category created', {
+        categoryId: category.id,
+        name: category.name
+      });
+
       res.status(201).json({ category });
     } catch (error) {
-      console.error('Create category error:', error);
+      logger.error('Create category error', {
+        name,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to create category' });
     }
   }
@@ -132,14 +149,13 @@ router.post('/update',
     body('description').optional().isString()
   ],
   async (req: Request<{}, {}, { id: string; name?: string; description?: string }>, res: Response) => {
+    const { id, name, description } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { id, name, description } = req.body;
       const updateData: Prisma.CategoryUpdateInput = {};
 
       // Build update object with only provided fields
@@ -168,13 +184,22 @@ router.post('/update',
         data: updateData
       });
 
+      logger.info('Category updated', {
+        categoryId: id,
+        updates: { name, description }
+      });
+
       res.json({ category });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         res.status(404).json({ error: 'Category not found' });
         return;
       }
-      console.error('Update category error:', error);
+      logger.error('Update category error', {
+        categoryId: id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to update category' });
     }
   }
@@ -186,14 +211,13 @@ router.post('/delete',
     body('id').isUUID().withMessage('Invalid category ID')
   ],
   async (req: Request<{}, {}, { id: string }>, res: Response) => {
+    const { id } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { id } = req.body;
 
       // Check if category has products
       const category = await prisma.category.findUnique({
@@ -223,6 +247,8 @@ router.post('/delete',
         where: { id }
       });
 
+      logger.info('Category deleted', { categoryId: id });
+
       res.json({ 
         success: true,
         message: 'Category deleted successfully' 
@@ -232,7 +258,11 @@ router.post('/delete',
         res.status(404).json({ error: 'Category not found' });
         return;
       }
-      console.error('Delete category error:', error);
+      logger.error('Delete category error', {
+        categoryId: id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to delete category' });
     }
   }

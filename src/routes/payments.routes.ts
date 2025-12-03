@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth.middleware.js';
 import { prisma } from '../index.js';
 import Stripe from 'stripe';
 import type { CreatePaymentIntentRequest } from '../types/index.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -20,20 +21,19 @@ router.post('/intent',
     body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number')
   ],
   async (req: Request<{}, {}, CreatePaymentIntentRequest>, res: Response) => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const userId = req.user.userId;
+    const { orderId, amount } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-      }
-
-      const { orderId, amount } = req.body;
-      const userId = req.user.userId;
 
       // Verify order exists and belongs to user
       const order = await prisma.order.findUnique({
@@ -95,13 +95,24 @@ router.post('/intent',
         }
       });
 
+      logger.info('Payment intent created', {
+        orderId,
+        amount,
+        transactionId: paymentIntent.id
+      });
+
       res.json({
         clientSecret: paymentIntent.client_secret,
         amount: amount,
         orderId: orderId
       });
     } catch (error) {
-      console.error('Create payment intent error:', error);
+      logger.error('Create payment intent error', {
+        orderId,
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to create payment intent' });
     }
   }

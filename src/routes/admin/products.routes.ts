@@ -4,6 +4,7 @@ import { authenticate, requireAdmin } from '../../middleware/auth.middleware.js'
 import { prisma } from '../../index.js';
 import type { CreateProductRequest, UpdateProductRequest } from '../../types/index.js';
 import { Prisma } from '@prisma/client';
+import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
@@ -22,14 +23,13 @@ router.post('/',
     body('isAvailable').optional().isBoolean()
   ],
   async (req: Request<{}, {}, CreateProductRequest>, res: Response) => {
+    const { name, description, price, imageUrl, categoryId, isAvailable = true } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { name, description, price, imageUrl, categoryId, isAvailable = true } = req.body;
 
       // Verify category exists
       const category = await prisma.category.findUnique({
@@ -55,9 +55,21 @@ router.post('/',
         }
       });
 
+      logger.info('Product created', {
+        productId: product.id,
+        name: product.name,
+        price: product.price.toString(),
+        categoryId
+      });
+
       res.status(201).json({ product });
     } catch (error) {
-      console.error('Create product error:', error);
+      logger.error('Create product error', {
+        name,
+        categoryId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to create product' });
     }
   }
@@ -75,14 +87,13 @@ router.post('/update',
     body('categoryId').optional().isUUID()
   ],
   async (req: Request<{}, {}, UpdateProductRequest & { id: string }>, res: Response) => {
+    const { id, ...updateFields } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { id, ...updateFields } = req.body;
       const updateData: Prisma.ProductUpdateInput = {};
 
       // Build update object with only provided fields
@@ -111,13 +122,22 @@ router.post('/update',
         }
       });
 
+      logger.info('Product updated', {
+        productId: id,
+        updates: updateFields
+      });
+
       res.json({ product });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         res.status(404).json({ error: 'Product not found' });
         return;
       }
-      console.error('Update product error:', error);
+      logger.error('Update product error', {
+        productId: id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to update product' });
     }
   }

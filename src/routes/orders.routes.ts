@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth.middleware.js';
 import { prisma } from '../index.js';
 import type { CreateOrderRequest } from '../types/index.js';
 import { OrderType, OrderStatus } from '@prisma/client';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -21,20 +22,19 @@ router.post('/',
     body('paymentMethod').isIn(['CASH', 'CARD']).withMessage('Payment method must be CASH or CARD')
   ],
   async (req: Request<{}, {}, CreateOrderRequest>, res: Response) => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const userId = req.user.userId;
+    const { items, orderType, scheduledTime, paymentMethod } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      if (!req.user) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-      }
-
-      const { items, orderType, scheduledTime, paymentMethod } = req.body;
-      const userId = req.user.userId;
 
       // Validate all products exist and are available
       const productIds = items.map(item => item.productId);
@@ -103,9 +103,21 @@ router.post('/',
         return newOrder;
       });
 
+      logger.info('Order created successfully', {
+        orderId: order.id,
+        userId,
+        totalAmount: order.totalAmount.toString(),
+        orderType,
+        itemCount: items.length
+      });
+
       res.status(201).json({ order });
     } catch (error) {
-      console.error('Create order error:', error);
+      logger.error('Create order error', {
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to create order' });
     }
   }
@@ -113,13 +125,13 @@ router.post('/',
 
 // POST /api/v1/orders/my
 router.post('/my', async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
 
-    const userId = req.user.userId;
+  const userId = req.user.userId;
+  try {
 
     const orders = await prisma.order.findMany({
       where: { userId },
@@ -148,9 +160,17 @@ router.post('/my', async (req: Request, res: Response) => {
       }
     });
 
+    logger.debug('User orders retrieved', {
+      userId,
+      orderCount: orders.length
+    });
     res.json({ orders });
   } catch (error) {
-    console.error('Get orders error:', error);
+    logger.error('Get orders error', {
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     res.status(500).json({ error: 'Failed to retrieve orders' });
   }
 });

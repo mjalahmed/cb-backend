@@ -6,6 +6,7 @@ import { verifyOTP } from '../utils/otp.util.js';
 import { generateToken } from '../utils/jwt.util.js';
 import { hashPassword, comparePassword } from '../utils/password.util.js';
 import type { RegisterRequest, LoginRequest, SendOTPRequest, VerifyPhoneRequest } from '../types/index.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -88,6 +89,12 @@ router.post('/register',
       // Send OTP for phone verification
       await sendOTP(phoneNumber);
 
+      logger.info('User registered successfully', {
+        userId: user.id,
+        username: user.username,
+        phoneNumber: user.phoneNumber
+      });
+
       res.status(201).json({
         success: true,
         message: 'User registered successfully. Please verify your phone number.',
@@ -101,7 +108,10 @@ router.post('/register',
         }
       });
     } catch (error) {
-      console.error('Register error:', error);
+      logger.error('Register error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       const errorMessage = error instanceof Error ? error.message : 'Failed to register user';
       res.status(500).json({ error: errorMessage });
     }
@@ -152,6 +162,12 @@ router.post('/login',
         role: user.role
       });
 
+      logger.info('User logged in successfully', {
+        userId: user.id,
+        username: user.username,
+        role: user.role
+      });
+
       res.json({
         success: true,
         token,
@@ -165,7 +181,10 @@ router.post('/login',
         }
       });
     } catch (error) {
-      console.error('Login error:', error);
+      logger.error('Login error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       const errorMessage = error instanceof Error ? error.message : 'Failed to login';
       res.status(500).json({ error: errorMessage });
     }
@@ -182,14 +201,13 @@ router.post('/send-otp',
       .withMessage('Invalid phone number format')
   ],
   async (req: Request<{}, {}, SendOTPRequest>, res: Response) => {
+    const { phoneNumber } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { phoneNumber } = req.body;
 
       // Verify phone number belongs to a user
       const user = await prisma.user.findUnique({
@@ -204,12 +222,18 @@ router.post('/send-otp',
       // Send OTP via Twilio
       await sendOTP(phoneNumber);
 
+      logger.info('OTP sent successfully', { phoneNumber });
+
       res.json({
         success: true,
         message: 'OTP sent successfully'
       });
     } catch (error) {
-      console.error('Send OTP error:', error);
+      logger.error('Send OTP error', {
+        phoneNumber,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       const errorMessage = error instanceof Error ? error.message : 'Failed to send OTP';
       res.status(500).json({ error: errorMessage });
     }
@@ -229,14 +253,13 @@ router.post('/verify-phone',
       .withMessage('OTP must be 6 digits')
   ],
   async (req: Request<{}, {}, VerifyPhoneRequest>, res: Response) => {
+    const { phoneNumber, otp } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { phoneNumber, otp } = req.body;
 
       // Verify OTP
       const verification = verifyOTP(phoneNumber, otp);
@@ -261,6 +284,11 @@ router.post('/verify-phone',
         data: { phoneVerified: true }
       });
 
+      logger.info('Phone number verified successfully', {
+        userId: updatedUser.id,
+        phoneNumber: updatedUser.phoneNumber
+      });
+
       res.json({
         success: true,
         message: 'Phone number verified successfully',
@@ -274,7 +302,11 @@ router.post('/verify-phone',
         }
       });
     } catch (error) {
-      console.error('Verify phone error:', error);
+      logger.error('Verify phone error', {
+        phoneNumber,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       const errorMessage = error instanceof Error ? error.message : 'Failed to verify phone number';
       res.status(500).json({ error: errorMessage });
     }

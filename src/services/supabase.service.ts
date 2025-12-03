@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import logger from '../utils/logger.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.warn('⚠️  Supabase credentials not configured. Image uploads will not work.');
+  logger.warn('⚠️  Supabase credentials not configured. Image uploads will not work.');
 }
 
 export const supabase = supabaseUrl && supabaseKey 
@@ -61,7 +62,11 @@ export const uploadImage = async (
       });
 
     if (error) {
-      console.error('Supabase upload error:', error);
+      logger.error('Supabase upload error', {
+        fileName,
+        folder,
+        error: error.message
+      });
       return {
         success: false,
         error: error.message
@@ -73,12 +78,23 @@ export const uploadImage = async (
       .from('product-images')
       .getPublicUrl(filePath);
 
+    logger.info('Image uploaded successfully', {
+      fileName,
+      folder,
+      url: urlData.publicUrl
+    });
+
     return {
       success: true,
       url: urlData.publicUrl
     };
   } catch (error) {
-    console.error('Image upload error:', error);
+    logger.error('Image upload error', {
+      fileName,
+      folder,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to upload image'
@@ -107,13 +123,21 @@ export const deleteImage = async (filePath: string): Promise<boolean> => {
       .remove([path]);
 
     if (error) {
-      console.error('Supabase delete error:', error);
+      logger.error('Supabase delete error', {
+        filePath,
+        error: error.message
+      });
       return false;
     }
 
+    logger.info('Image deleted successfully', { filePath });
     return true;
   } catch (error) {
-    console.error('Image delete error:', error);
+    logger.error('Image delete error', {
+      filePath,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return false;
   }
 };

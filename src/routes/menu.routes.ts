@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { prisma } from '../index.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -10,14 +11,13 @@ router.post('/products',
     body('categoryId').optional().isUUID().withMessage('Invalid category ID')
   ],
   async (req: Request<{}, {}, { categoryId?: string }>, res: Response) => {
+    const { categoryId } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         res.status(400).json({ errors: errors.array() });
         return;
       }
-
-      const { categoryId } = req.body;
 
       const where: {
         isAvailable: boolean;
@@ -45,9 +45,17 @@ router.post('/products',
         }
       });
 
+      logger.debug('Products retrieved', {
+        categoryId,
+        count: products.length
+      });
       res.json({ products });
     } catch (error) {
-      console.error('Get products error:', error);
+      logger.error('Get products error', {
+        categoryId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       res.status(500).json({ error: 'Failed to retrieve products' });
     }
   }

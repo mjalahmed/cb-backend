@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import { prisma } from '../index.js';
 import Stripe from 'stripe';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.post('/', async (req: Request, res: Response) => {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.log('Stripe webhook secret not configured');
+    logger.warn('Stripe webhook secret not configured');
     res.status(400).json({ error: 'Webhook secret not configured' });
     return;
   }
@@ -30,7 +31,10 @@ router.post('/', async (req: Request, res: Response) => {
     event = stripe.webhooks.constructEvent(req.body as Buffer, sig, webhookSecret);
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('Webhook signature verification failed:', errorMessage);
+    logger.error('Webhook signature verification failed', {
+      error: errorMessage,
+      stack: err instanceof Error ? err.stack : undefined
+    });
     res.status(400).send(`Webhook Error: ${errorMessage}`);
     return;
   }
@@ -50,9 +54,16 @@ router.post('/', async (req: Request, res: Response) => {
           }
         });
 
-        console.log(`Payment succeeded for order ${orderId}`);
+        logger.info('Payment succeeded', {
+          orderId,
+          transactionId: paymentIntent.id
+        });
       } catch (error) {
-        console.error('Error updating payment status:', error);
+        logger.error('Error updating payment status', {
+          orderId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
       }
     }
   } else if (event.type === 'payment_intent.payment_failed') {
@@ -69,9 +80,16 @@ router.post('/', async (req: Request, res: Response) => {
           }
         });
 
-        console.log(`Payment failed for order ${orderId}`);
+        logger.warn('Payment failed', {
+          orderId,
+          transactionId: paymentIntent.id
+        });
       } catch (error) {
-        console.error('Error updating payment status:', error);
+        logger.error('Error updating payment status', {
+          orderId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined
+        });
       }
     }
   }

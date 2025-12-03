@@ -2,6 +2,8 @@ import express, { type Request, type Response, type NextFunction, type ErrorRequ
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import logger from './utils/logger.js';
+import { requestLogger, errorLogger } from './middleware/logger.middleware.js';
 
 // Import routes
 import authRoutes from './routes/auth.routes.js';
@@ -18,6 +20,9 @@ import webhookRoutes from './routes/webhook.routes.js';
 // Load environment variables
 dotenv.config();
 
+// Initialize logger
+logger.info('🚀 Starting Chocobar Backend API...');
+
 // Initialize Prisma Client
 export const prisma = new PrismaClient();
 
@@ -32,6 +37,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature']
 }));
+
+// Request logging middleware (before other middleware)
+app.use(requestLogger);
 
 // Stripe webhook needs raw body, so mount it before JSON parser
 app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }), webhookRoutes);
@@ -62,9 +70,11 @@ app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
+// Error logging middleware (before error handler)
+app.use(errorLogger);
+
 // Error handler
 const errorHandler: ErrorRequestHandler = (err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Error:', err);
   const status = (err as any).status || 500;
   res.status(status).json({
     error: err.message || 'Internal server error',
@@ -76,16 +86,32 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Chocobar API server running on port ${PORT}`);
-  console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`🚀 Chocobar API server running on port ${PORT}`);
+  logger.info(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`🌐 Base URL: http://localhost:${PORT}`);
+  logger.info(`📚 API Documentation: http://localhost:${PORT}/health`);
 });
 
 // Graceful shutdown
 const shutdown = async (): Promise<void> => {
+  logger.info('🛑 Shutting down server...');
   await prisma.$disconnect();
+  logger.info('✅ Server shut down gracefully');
   process.exit(0);
 };
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason: Error) => {
+  logger.error('Unhandled Promise Rejection', { error: reason });
+  throw reason;
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error: Error) => {
+  logger.error('Uncaught Exception', { error: error.message, stack: error.stack });
+  process.exit(1);
+});
 

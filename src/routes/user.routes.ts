@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { prisma } from '../index.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -32,7 +33,11 @@ router.post('/me', authenticate, async (req: Request, res: Response) => {
 
     res.json({ user });
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.error('Get user error', {
+      userId: req.user?.userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     res.status(500).json({ error: 'Failed to retrieve user' });
   }
 });
