@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from 'express';
-import { body, param, validationResult } from 'express-validator';
+import { body, validationResult } from 'express-validator';
 import { authenticate, requireAdmin } from '../../middleware/auth.middleware.js';
 import { prisma } from '../../index.js';
 import type { CreateProductRequest, UpdateProductRequest } from '../../types/index.js';
@@ -63,10 +63,10 @@ router.post('/',
   }
 );
 
-// PATCH /api/v1/admin/products/:id
-router.patch('/:id',
+// POST /api/v1/admin/products/update
+router.post('/update',
   [
-    param('id').isUUID().withMessage('Invalid product ID'),
+    body('id').isUUID().withMessage('Invalid product ID'),
     body('name').optional().notEmpty(),
     body('description').optional().isString(),
     body('price').optional().isFloat({ min: 0 }),
@@ -74,7 +74,7 @@ router.patch('/:id',
     body('isAvailable').optional().isBoolean(),
     body('categoryId').optional().isUUID()
   ],
-  async (req: Request<{ id: string }, {}, UpdateProductRequest>, res: Response) => {
+  async (req: Request<{}, {}, UpdateProductRequest & { id: string }>, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -82,25 +82,25 @@ router.patch('/:id',
         return;
       }
 
-      const { id } = req.params;
+      const { id, ...updateFields } = req.body;
       const updateData: Prisma.ProductUpdateInput = {};
 
       // Build update object with only provided fields
-      if (req.body.name !== undefined) updateData.name = req.body.name;
-      if (req.body.description !== undefined) updateData.description = req.body.description;
-      if (req.body.price !== undefined) updateData.price = req.body.price;
-      if (req.body.imageUrl !== undefined) updateData.imageUrl = req.body.imageUrl;
-      if (req.body.isAvailable !== undefined) updateData.isAvailable = req.body.isAvailable;
-      if (req.body.categoryId !== undefined) {
+      if (updateFields.name !== undefined) updateData.name = updateFields.name;
+      if (updateFields.description !== undefined) updateData.description = updateFields.description;
+      if (updateFields.price !== undefined) updateData.price = updateFields.price;
+      if (updateFields.imageUrl !== undefined) updateData.imageUrl = updateFields.imageUrl;
+      if (updateFields.isAvailable !== undefined) updateData.isAvailable = updateFields.isAvailable;
+      if (updateFields.categoryId !== undefined) {
         // Verify category exists
         const category = await prisma.category.findUnique({
-          where: { id: req.body.categoryId }
+          where: { id: updateFields.categoryId }
         });
         if (!category) {
           res.status(404).json({ error: 'Category not found' });
           return;
         }
-        updateData.category = { connect: { id: req.body.categoryId } };
+        updateData.category = { connect: { id: updateFields.categoryId } };
       }
 
       const product = await prisma.product.update({
@@ -124,4 +124,3 @@ router.patch('/:id',
 );
 
 export default router;
-

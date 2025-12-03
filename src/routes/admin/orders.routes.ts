@@ -1,8 +1,7 @@
 import express, { type Request, type Response } from 'express';
-import { param, query, body, validationResult } from 'express-validator';
+import { body, validationResult } from 'express-validator';
 import { authenticate, requireAdmin } from '../../middleware/auth.middleware.js';
 import { prisma } from '../../index.js';
-import type { UpdateOrderStatusRequest } from '../../types/index.js';
 import { OrderStatus, Prisma } from '@prisma/client';
 
 const router = express.Router();
@@ -11,17 +10,23 @@ const router = express.Router();
 router.use(authenticate);
 router.use(requireAdmin);
 
-// GET /api/v1/admin/orders
-router.get('/',
+// POST /api/v1/admin/orders
+router.post('/',
   [
-    query('status').optional().isIn(['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'])
+    body('status').optional().isIn(['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'])
   ],
-  async (req: Request, res: Response) => {
+  async (req: Request<{}, {}, { status?: string }>, res: Response) => {
     try {
-      const { status } = req.query;
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      const { status } = req.body;
 
       const where: Prisma.OrderWhereInput = {};
-      if (status && typeof status === 'string') {
+      if (status) {
         where.status = status as OrderStatus;
       }
 
@@ -66,15 +71,15 @@ router.get('/',
   }
 );
 
-// PATCH /api/v1/admin/orders/:id/status
-router.patch('/:id/status',
+// POST /api/v1/admin/orders/status
+router.post('/status',
   [
-    param('id').isUUID().withMessage('Invalid order ID'),
+    body('id').isUUID().withMessage('Invalid order ID'),
     body('status')
       .isIn(['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'])
       .withMessage('Invalid order status')
   ],
-  async (req: Request<{ id: string }, {}, UpdateOrderStatusRequest>, res: Response) => {
+  async (req: Request<{}, {}, { id: string; status: OrderStatus }>, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -82,12 +87,11 @@ router.patch('/:id/status',
         return;
       }
 
-      const { id } = req.params;
-      const { status } = req.body;
+      const { id, status } = req.body;
 
       const order = await prisma.order.update({
         where: { id },
-        data: { status: status as OrderStatus },
+        data: { status },
         include: {
           user: {
             select: {
@@ -129,4 +133,3 @@ router.patch('/:id/status',
 );
 
 export default router;
-

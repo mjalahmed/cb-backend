@@ -370,7 +370,182 @@ Authorization: Bearer <admin-token>
 
 ---
 
-### 5. Order Routes
+### 5. Admin - Category Routes
+
+#### GET `/api/v1/admin/categories`
+
+Get all categories with product counts.
+
+**Access:** Admin Only
+
+**Headers:**
+```
+Authorization: Bearer <admin-token>
+```
+
+**Response (200):**
+```json
+{
+  "categories": [
+    {
+      "id": "uuid",
+      "name": "Chocolate Bars",
+      "description": "Classic chocolate bars",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "_count": {
+        "products": 5
+      }
+    }
+  ]
+}
+```
+
+---
+
+#### GET `/api/v1/admin/categories/:id`
+
+Get a single category with its products.
+
+**Access:** Admin Only
+
+**Headers:**
+```
+Authorization: Bearer <admin-token>
+```
+
+**Response (200):**
+```json
+{
+  "category": {
+    "id": "uuid",
+    "name": "Chocolate Bars",
+    "description": "Classic chocolate bars",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z",
+    "products": [
+      {
+        "id": "uuid",
+        "name": "Dark Chocolate Bar",
+        "price": "12.99",
+        "isAvailable": true,
+        "imageUrl": "https://example.com/image.jpg"
+      }
+    ],
+    "_count": {
+      "products": 5
+    }
+  }
+}
+```
+
+---
+
+#### POST `/api/v1/admin/categories`
+
+Create a new category.
+
+**Access:** Admin Only
+
+**Headers:**
+```
+Authorization: Bearer <admin-token>
+```
+
+**Request Body:**
+```json
+{
+  "name": "Truffles",
+  "description": "Premium chocolate truffles"
+}
+```
+
+**Response (201):**
+```json
+{
+  "category": {
+    "id": "uuid",
+    "name": "Truffles",
+    "description": "Premium chocolate truffles",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "error": "Category with this name already exists"
+}
+```
+
+---
+
+#### PATCH `/api/v1/admin/categories/:id`
+
+Update a category.
+
+**Access:** Admin Only
+
+**Headers:**
+```
+Authorization: Bearer <admin-token>
+```
+
+**Request Body (all fields optional):**
+```json
+{
+  "name": "Updated Category Name",
+  "description": "Updated description"
+}
+```
+
+**Response (200):**
+```json
+{
+  "category": {
+    "id": "uuid",
+    "name": "Updated Category Name",
+    "description": "Updated description",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+---
+
+#### DELETE `/api/v1/admin/categories/:id`
+
+Delete a category.
+
+**Access:** Admin Only
+
+**Headers:**
+```
+Authorization: Bearer <admin-token>
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Category deleted successfully"
+}
+```
+
+**Error Response (400):**
+```json
+{
+  "error": "Cannot delete category with existing products. Please remove or reassign products first."
+}
+```
+
+**Note:** Categories with products cannot be deleted. Remove or reassign products first.
+
+---
+
+### 6. Order Routes
 
 #### POST `/api/v1/orders`
 
@@ -484,7 +659,7 @@ Authorization: Bearer <token>
 
 ---
 
-### 6. Admin - Order Routes
+### 7. Admin - Order Routes
 
 #### GET `/api/v1/admin/orders`
 
@@ -567,7 +742,7 @@ Authorization: Bearer <admin-token>
 
 ---
 
-### 7. Payment Routes
+### 8. Payment Routes
 
 #### POST `/api/v1/payments/intent`
 

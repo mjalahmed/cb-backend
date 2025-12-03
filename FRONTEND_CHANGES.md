@@ -1,13 +1,13 @@
 # 🔄 Frontend Changes Required
 
+## Complete API Changes Summary
+
+---
+
 ## 1. Authentication System Update
 
 **Changed from:** Phone number + OTP login  
 **Changed to:** Username/Password login + Phone verification (optional)
-
----
-
-## 2. New API Endpoints
 
 ### Register User
 ```
@@ -40,10 +40,6 @@ POST /api/v1/auth/register
 }
 ```
 
-**Note:** OTP is automatically sent to phone number after registration.
-
----
-
 ### Login
 ```
 POST /api/v1/auth/login
@@ -73,9 +69,7 @@ POST /api/v1/auth/login
 }
 ```
 
----
-
-### Verify Phone (Renamed from verify-otp)
+### Verify Phone
 ```
 POST /api/v1/auth/verify-phone
 ```
@@ -88,48 +82,16 @@ POST /api/v1/auth/verify-phone
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Phone number verified successfully",
-  "user": {
-    "id": "uuid",
-    "username": "johndoe",
-    "email": "john@example.com",
-    "phoneNumber": "+1234567890",
-    "phoneVerified": true,
-    "role": "CUSTOMER"
-  }
-}
-```
-
 ---
 
-### Send OTP (Updated)
-```
-POST /api/v1/auth/send-otp
-```
-
-**Request:**
-```json
-{
-  "phoneNumber": "+1234567890"
-}
-```
-
-**Note:** Phone number must belong to an existing user account.
-
----
-
-## 3. Image Upload Endpoint (NEW - Supabase)
+## 2. Image Upload (Supabase)
 
 ### Upload Product Image
 ```
 POST /api/v1/admin/upload/image
 ```
 
-**Access:** Admin Only (requires JWT token)
+**Access:** Admin Only
 
 **Headers:**
 ```
@@ -142,7 +104,7 @@ Content-Type: multipart/form-data
 - `fileName` (optional, string): Custom filename
 - `folder` (optional, string): Folder path (default: 'products')
 
-**Response (200):**
+**Response:**
 ```json
 {
   "success": true,
@@ -151,25 +113,127 @@ Content-Type: multipart/form-data
 }
 ```
 
-**Error Response (400):**
+---
+
+## 3. Admin - Categories CRUD (NEW)
+
+### Get All Categories
+```
+GET /api/v1/admin/categories
+```
+
+**Access:** Admin Only
+
+**Response:**
 ```json
 {
-  "error": "No image file provided"
+  "categories": [
+    {
+      "id": "uuid",
+      "name": "Chocolate Bars",
+      "description": "Classic chocolate bars",
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "_count": {
+        "products": 5
+      }
+    }
+  ]
 }
 ```
 
-**Error Response (500):**
+### Get Single Category
+```
+GET /api/v1/admin/categories/:id
+```
+
+**Response:**
 ```json
 {
-  "error": "Failed to upload image"
+  "category": {
+    "id": "uuid",
+    "name": "Chocolate Bars",
+    "description": "Classic chocolate bars",
+    "products": [
+      {
+        "id": "uuid",
+        "name": "Dark Chocolate Bar",
+        "price": "12.99",
+        "isAvailable": true,
+        "imageUrl": "https://example.com/image.jpg"
+      }
+    ],
+    "_count": {
+      "products": 5
+    }
+  }
+}
+```
+
+### Create Category
+```
+POST /api/v1/admin/categories
+```
+
+**Request:**
+```json
+{
+  "name": "Truffles",
+  "description": "Premium chocolate truffles"
+}
+```
+
+**Response:**
+```json
+{
+  "category": {
+    "id": "uuid",
+    "name": "Truffles",
+    "description": "Premium chocolate truffles",
+    "createdAt": "2024-01-01T00:00:00.000Z",
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  }
+}
+```
+
+### Update Category
+```
+PATCH /api/v1/admin/categories/:id
+```
+
+**Request:**
+```json
+{
+  "name": "Updated Name",
+  "description": "Updated description"
+}
+```
+
+### Delete Category
+```
+DELETE /api/v1/admin/categories/:id
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Category deleted successfully"
+}
+```
+
+**Error (if category has products):**
+```json
+{
+  "error": "Cannot delete category with existing products. Please remove or reassign products first."
 }
 ```
 
 ---
 
-## 4. Updated Product Endpoints
+## 4. Admin - Products
 
-### Create Product (Updated)
+### Create Product
 ```
 POST /api/v1/admin/products
 ```
@@ -181,38 +245,21 @@ POST /api/v1/admin/products
   "description": "Rich dark chocolate",
   "price": 12.99,
   "categoryId": "uuid",
-  "imageUrl": "https://your-project.supabase.co/storage/v1/object/public/product-images/products/1234567890_chocolate.jpg",
+  "imageUrl": "https://your-project.supabase.co/storage/v1/object/public/product-images/products/image.jpg",
   "isAvailable": true
 }
 ```
 
-**Note:** Use the `imageUrl` from the upload endpoint response.
+**Note:** Upload image first using `/api/v1/admin/upload/image`, then use the returned URL.
 
----
-
-### Update Product (Updated)
+### Update Product
 ```
 PATCH /api/v1/admin/products/:id
 ```
 
-**Request:**
-```json
-{
-  "name": "Updated Name",
-  "imageUrl": "https://your-project.supabase.co/storage/v1/object/public/product-images/products/new_image.jpg",
-  "price": 15.99
-}
-```
-
 ---
 
-## 5. Removed Endpoints
-
-- ❌ `POST /api/v1/auth/verify-otp` (replaced by `/verify-phone`)
-
----
-
-## 6. User Object Changes
+## 5. User Object Changes
 
 **Before:**
 ```json
@@ -237,96 +284,25 @@ PATCH /api/v1/admin/products/:id
 
 ---
 
-## 7. JWT Token Changes
+## 6. JWT Token Changes
 
 **Before:** Token contained `phoneNumber`  
 **After:** Token contains `username`
 
 ---
 
-## 8. New User Flow
-
-1. **Registration Page**
-   - Username (required, 3-30 chars, alphanumeric + underscore)
-   - Email (optional)
-   - Password (required, min 6 chars)
-   - Phone Number (required, E.164 format)
-   - After submit → OTP automatically sent
-
-2. **Phone Verification Page** (Optional but recommended)
-   - Enter OTP received via SMS
-   - Updates `phoneVerified` to `true`
-
-3. **Login Page**
-   - Username
-   - Password
-   - Returns JWT token
-
----
-
-## 9. Image Upload Flow (NEW)
-
-### For Admin - Product Image Upload
-
-1. **Upload Image First:**
-   ```javascript
-   const formData = new FormData();
-   formData.append('image', file);
-   formData.append('fileName', 'chocolate-bar.jpg'); // optional
-   formData.append('folder', 'products'); // optional
-
-   const uploadRes = await fetch('http://localhost:3000/api/v1/admin/upload/image', {
-     method: 'POST',
-     headers: {
-       'Authorization': `Bearer ${adminToken}`
-     },
-     body: formData
-   });
-
-   const { url } = await uploadRes.json();
-   ```
-
-2. **Use URL in Product Creation:**
-   ```javascript
-   const productRes = await fetch('http://localhost:3000/api/v1/admin/products', {
-     method: 'POST',
-     headers: {
-       'Authorization': `Bearer ${adminToken}`,
-       'Content-Type': 'application/json'
-     },
-     body: JSON.stringify({
-       name: 'Dark Chocolate Bar',
-       price: 12.99,
-       categoryId: 'uuid',
-       imageUrl: url // Use URL from upload
-     })
-   });
-   ```
-
----
-
-## 10. Validation Rules
+## 7. Validation Rules
 
 - **Username:** 3-30 characters, letters/numbers/underscores only
 - **Password:** Minimum 6 characters
 - **Email:** Standard email format (optional)
 - **Phone:** E.164 format (e.g., `+1234567890`)
 - **Image Upload:** Max 5MB, images only (jpeg, png, gif, webp)
+- **Category Name:** Required, must be unique
 
 ---
 
-## 11. Breaking Changes
-
-⚠️ **Must Update:**
-- Login form: Change from phone/OTP to username/password
-- Registration: Add username, password, email fields
-- User state: Update to include `username`, `email`, `phoneVerified`
-- JWT handling: Token now has `username` instead of `phoneNumber`
-- Product creation: Now requires image upload step first (for admin)
-
----
-
-## 12. Example Frontend Code
+## 8. Example Frontend Code
 
 ### Register
 ```javascript
@@ -359,18 +335,6 @@ const login = async (username, password) => {
 };
 ```
 
-### Verify Phone
-```javascript
-const verifyPhone = async (phoneNumber, otp) => {
-  const res = await fetch('http://localhost:3000/api/v1/auth/verify-phone', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phoneNumber, otp })
-  });
-  return res.json();
-};
-```
-
 ### Upload Image (Admin)
 ```javascript
 const uploadImage = async (file, token) => {
@@ -383,6 +347,64 @@ const uploadImage = async (file, token) => {
       'Authorization': `Bearer ${token}`
     },
     body: formData
+  });
+  return res.json();
+};
+```
+
+### Create Category (Admin)
+```javascript
+const createCategory = async (categoryData, token) => {
+  const res = await fetch('http://localhost:3000/api/v1/admin/categories', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: categoryData.name,
+      description: categoryData.description
+    })
+  });
+  return res.json();
+};
+```
+
+### Get All Categories (Admin)
+```javascript
+const getCategories = async (token) => {
+  const res = await fetch('http://localhost:3000/api/v1/admin/categories', {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+  return res.json();
+};
+```
+
+### Update Category (Admin)
+```javascript
+const updateCategory = async (categoryId, updates, token) => {
+  const res = await fetch(`http://localhost:3000/api/v1/admin/categories/${categoryId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(updates)
+  });
+  return res.json();
+};
+```
+
+### Delete Category (Admin)
+```javascript
+const deleteCategory = async (categoryId, token) => {
+  const res = await fetch(`http://localhost:3000/api/v1/admin/categories/${categoryId}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
   });
   return res.json();
 };
@@ -413,29 +435,27 @@ const createProduct = async (productData, imageFile, token) => {
 
 ---
 
-## 13. Environment Variables Needed (Backend)
+## 9. Breaking Changes
 
-The backend needs these Supabase environment variables:
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-# OR
-SUPABASE_ANON_KEY=your_anon_key
-```
-
-**Note:** Frontend doesn't need these - image uploads are handled by backend.
+⚠️ **Must Update:**
+- Login form: Change from phone/OTP to username/password
+- Registration: Add username, password, email fields
+- User state: Update to include `username`, `email`, `phoneVerified`
+- JWT handling: Token now has `username` instead of `phoneNumber`
+- Product creation: Now requires image upload step first (for admin)
+- **NEW:** Add category management UI for admin
 
 ---
 
-## 14. Supabase Setup Required
+## 10. New Features Summary
 
-1. Create Supabase project
-2. Create storage bucket named `product-images`
-3. Set bucket to public (or configure RLS policies)
-4. Add environment variables to backend `.env`
+✅ Username/Password authentication  
+✅ Phone verification (optional)  
+✅ Supabase image uploads  
+✅ **Category CRUD operations (Admin)**  
+✅ Product management with images  
 
 ---
 
 **Base URL:** `http://localhost:3000/api/v1`  
 **All endpoints require:** `Content-Type: application/json` header (except image upload which uses `multipart/form-data`)
-

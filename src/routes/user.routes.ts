@@ -4,8 +4,8 @@ import { prisma } from '../index.js';
 
 const router = express.Router();
 
-// GET /api/v1/user/me
-router.get('/me', authenticate, async (req: Request, res: Response) => {
+// POST /api/v1/user/me
+router.post('/me', authenticate, async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -38,4 +38,3 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
 });
 
 export default router;
-

@@ -111,8 +111,8 @@ router.post('/',
   }
 );
 
-// GET /api/v1/orders/my
-router.get('/my', async (req: Request, res: Response) => {
+// POST /api/v1/orders/my
+router.post('/my', async (req: Request, res: Response) => {
   try {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -156,4 +156,3 @@ router.get('/my', async (req: Request, res: Response) => {
 });
 
 export default router;
-

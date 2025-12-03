@@ -1,15 +1,15 @@
 import express, { type Request, type Response } from 'express';
-import { query, validationResult } from 'express-validator';
+import { body, validationResult } from 'express-validator';
 import { prisma } from '../index.js';
 
 const router = express.Router();
 
-// GET /api/v1/menu/products
-router.get('/products',
+// POST /api/v1/menu/products
+router.post('/products',
   [
-    query('category_id').optional().isUUID().withMessage('Invalid category ID')
+    body('categoryId').optional().isUUID().withMessage('Invalid category ID')
   ],
-  async (req: Request, res: Response) => {
+  async (req: Request<{}, {}, { categoryId?: string }>, res: Response) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -17,7 +17,7 @@ router.get('/products',
         return;
       }
 
-      const { category_id } = req.query;
+      const { categoryId } = req.body;
 
       const where: {
         isAvailable: boolean;
@@ -26,8 +26,8 @@ router.get('/products',
         isAvailable: true
       };
 
-      if (category_id && typeof category_id === 'string') {
-        where.categoryId = category_id;
+      if (categoryId) {
+        where.categoryId = categoryId;
       }
 
       const products = await prisma.product.findMany({
@@ -54,4 +54,3 @@ router.get('/products',
 );
 
 export default router;
-
