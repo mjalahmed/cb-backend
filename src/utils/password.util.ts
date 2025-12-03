@@ -19,3 +19,14 @@ export const comparePassword = async (
   return await bcrypt.compare(plainPassword, hashedPassword);
 };
 
+/**
+ * Validate password requirements:
+ * - Minimum 8 characters
+ */
+export const validateStrongPassword = (password: string): { valid: boolean; error?: string } => {
+  if (password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters long' };
+  }
+
+  return { valid: true };
+};

@@ -1,461 +1,286 @@
-# 🔄 Frontend Changes Required
+# Frontend Changes - API Updates
 
-## Complete API Changes Summary
+## Overview
+This document outlines the changes to the API that affect frontend implementation.
 
 ---
 
-## 1. Authentication System Update
+## 1. Authentication Changes
 
-**Changed from:** Phone number + OTP login  
-**Changed to:** Username/Password login + Phone verification (optional)
+### Login - Case Insensitive
+- **Change**: Username/email lookup is now case-insensitive
+- **Impact**: Users can log in with any case combination (e.g., "User", "USER", "user" all work)
+- **No API changes required** - Same endpoint, same request/response format
 
-### Register User
-```
-POST /api/v1/auth/register
-```
+### Registration - Password Requirements
+- **Change**: Password validation now requires minimum 8 characters
+- **New Requirements**:
+  - Minimum 8 characters
+- **Error Response**: 
+  ```json
+  {
+    "error": "Password must be at least 8 characters long"
+  }
+  ```
+- **Action Required**: Update password input validation on frontend to enforce minimum 8 characters
 
-**Request:**
+### Registration - Case Insensitive Username/Email
+- **Change**: Usernames and emails are stored in lowercase
+- **Impact**: Duplicate checks are case-insensitive
+- **Example**: If "John" is registered, "john", "JOHN", or "JoHn" cannot be registered
+- **No API changes required** - Same endpoint, same request/response format
+
+---
+
+## 2. Pagination Support
+
+All listing endpoints now support pagination. Add these optional parameters to requests:
+
+### Parameters
+- `page` (number, optional, default: 1) - Page number (minimum: 1)
+- `limit` (number, optional, default: 20) - Items per page (minimum: 1, maximum: 100)
+
+### Response Format
+All paginated endpoints now return:
 ```json
 {
-  "username": "johndoe",
-  "email": "john@example.com",  // optional
-  "password": "password123",
-  "phoneNumber": "+1234567890"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "User registered successfully. Please verify your phone number.",
-  "user": {
-    "id": "uuid",
-    "username": "johndoe",
-    "email": "john@example.com",
-    "phoneNumber": "+1234567890",
-    "phoneVerified": false,
-    "role": "CUSTOMER"
+  "data": [...],  // Array of items
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalCount": 100,
+    "totalPages": 5
   }
 }
 ```
 
-### Login
-```
-POST /api/v1/auth/login
-```
+### Affected Endpoints
 
-**Request:**
+#### 1. Get Products
+**Endpoint**: `POST /api/v1/menu/products`
+
+**Request Body** (add pagination):
 ```json
 {
-  "username": "johndoe",
-  "password": "password123"
+  "categoryId": "optional-uuid",
+  "page": 1,
+  "limit": 20
 }
 ```
 
-**Response:**
+**Response**:
 ```json
 {
-  "success": true,
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid",
-    "username": "johndoe",
-    "email": "john@example.com",
-    "phoneNumber": "+1234567890",
-    "phoneVerified": true,
-    "role": "CUSTOMER"
+  "products": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalCount": 50,
+    "totalPages": 3
   }
 }
 ```
 
-### Verify Phone
-```
-POST /api/v1/auth/verify-phone
-```
+#### 2. Get User Orders
+**Endpoint**: `POST /api/v1/orders/my`
 
-**Request:**
+**Request Body** (add pagination and sorting):
 ```json
 {
-  "phoneNumber": "+1234567890",
-  "otp": "123456"
+  "page": 1,
+  "limit": 20,
+  "sortBy": "date"  // Optional: "date" | "status" | "amount"
 }
 ```
 
----
-
-## 2. Image Upload (Supabase)
-
-### Upload Product Image
-```
-POST /api/v1/admin/upload/image
-```
-
-**Access:** Admin Only
-
-**Headers:**
-```
-Authorization: Bearer <admin-token>
-Content-Type: multipart/form-data
-```
-
-**Request (FormData):**
-- `image` (File): Image file (max 5MB, images only)
-- `fileName` (optional, string): Custom filename
-- `folder` (optional, string): Folder path (default: 'products')
-
-**Response:**
+**Response**:
 ```json
 {
-  "success": true,
-  "url": "https://your-project.supabase.co/storage/v1/object/public/product-images/products/1234567890_chocolate.jpg",
-  "message": "Image uploaded successfully"
-}
-```
-
----
-
-## 3. Admin - Categories CRUD (NEW)
-
-### Get All Categories
-```
-GET /api/v1/admin/categories
-```
-
-**Access:** Admin Only
-
-**Response:**
-```json
-{
-  "categories": [
-    {
-      "id": "uuid",
-      "name": "Chocolate Bars",
-      "description": "Classic chocolate bars",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "updatedAt": "2024-01-01T00:00:00.000Z",
-      "_count": {
-        "products": 5
-      }
-    }
-  ]
-}
-```
-
-### Get Single Category
-```
-GET /api/v1/admin/categories/:id
-```
-
-**Response:**
-```json
-{
-  "category": {
-    "id": "uuid",
-    "name": "Chocolate Bars",
-    "description": "Classic chocolate bars",
-    "products": [
-      {
-        "id": "uuid",
-        "name": "Dark Chocolate Bar",
-        "price": "12.99",
-        "isAvailable": true,
-        "imageUrl": "https://example.com/image.jpg"
-      }
-    ],
-    "_count": {
-      "products": 5
-    }
+  "orders": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalCount": 45,
+    "totalPages": 3
   }
 }
 ```
 
-### Create Category
-```
-POST /api/v1/admin/categories
-```
+#### 3. Get Admin Orders
+**Endpoint**: `POST /api/v1/admin/orders`
 
-**Request:**
+**Request Body** (add pagination and sorting):
 ```json
 {
-  "name": "Truffles",
-  "description": "Premium chocolate truffles"
+  "status": "PENDING",  // Optional filter
+  "page": 1,
+  "limit": 20,
+  "sortBy": "date"  // Optional: "date" | "status" | "amount"
 }
 ```
 
-**Response:**
+**Response**:
 ```json
 {
-  "category": {
-    "id": "uuid",
-    "name": "Truffles",
-    "description": "Premium chocolate truffles",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
+  "orders": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalCount": 120,
+    "totalPages": 6
   }
 }
 ```
 
-### Update Category
-```
-PATCH /api/v1/admin/categories/:id
-```
+#### 4. Get Categories (Admin)
+**Endpoint**: `POST /api/v1/admin/categories`
 
-**Request:**
+**Request Body** (add pagination):
 ```json
 {
-  "name": "Updated Name",
-  "description": "Updated description"
+  "page": 1,
+  "limit": 20
 }
 ```
 
-### Delete Category
-```
-DELETE /api/v1/admin/categories/:id
-```
-
-**Response:**
+**Response**:
 ```json
 {
-  "success": true,
-  "message": "Category deleted successfully"
-}
-```
-
-**Error (if category has products):**
-```json
-{
-  "error": "Cannot delete category with existing products. Please remove or reassign products first."
+  "categories": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "totalCount": 15,
+    "totalPages": 1
+  }
 }
 ```
 
 ---
 
-## 4. Admin - Products
+## 3. Order Sorting
 
-### Create Product
-```
-POST /api/v1/admin/products
-```
+### New Parameter: `sortBy`
+Available on order endpoints to control sorting order.
 
-**Request:**
+**Options**:
+- `"date"` (default) - Sort by creation date, newest first
+- `"status"` - Sort by status alphabetically
+- `"amount"` - Sort by total amount, highest first
+
+**Endpoints**:
+- `POST /api/v1/orders/my`
+- `POST /api/v1/admin/orders`
+
+**Example Request**:
 ```json
 {
-  "name": "Dark Chocolate Bar",
-  "description": "Rich dark chocolate",
-  "price": 12.99,
-  "categoryId": "uuid",
-  "imageUrl": "https://your-project.supabase.co/storage/v1/object/public/product-images/products/image.jpg",
-  "isAvailable": true
+  "page": 1,
+  "limit": 20,
+  "sortBy": "amount"
 }
-```
-
-**Note:** Upload image first using `/api/v1/admin/upload/image`, then use the returned URL.
-
-### Update Product
-```
-PATCH /api/v1/admin/products/:id
 ```
 
 ---
 
-## 5. User Object Changes
+## 4. Order Response Fields
 
-**Before:**
+### Guaranteed Fields
+All order responses now explicitly include:
+- `status` - Order status (PENDING, PREPARING, READY, COMPLETED, CANCELLED)
+- `createdAt` - Order creation date/time (ISO 8601 format)
+- `updatedAt` - Last update date/time (ISO 8601 format)
+
+**Example Order Object**:
 ```json
 {
   "id": "uuid",
-  "phoneNumber": "+1234567890",
-  "role": "CUSTOMER"
+  "userId": "uuid",
+  "totalAmount": "50.00",
+  "status": "PENDING",
+  "orderType": "DELIVERY",
+  "scheduledTime": null,
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T10:30:00.000Z",
+  "orderItems": [...],
+  "payment": {...}
 }
 ```
 
-**After:**
+---
+
+## 5. Error Responses
+
+### Password Validation Errors
+When password doesn't meet requirements, you'll receive this error message:
+
 ```json
 {
-  "id": "uuid",
-  "username": "johndoe",
-  "email": "john@example.com",
-  "phoneNumber": "+1234567890",
-  "phoneVerified": false,
-  "role": "CUSTOMER"
+  "error": "Password must be at least 8 characters long"
 }
 ```
 
 ---
 
-## 6. JWT Token Changes
+## Migration Guide
 
-**Before:** Token contained `phoneNumber`  
-**After:** Token contains `username`
+### Required Frontend Updates
 
----
+1. **Password Input Validation**
+   - Add client-side validation for minimum 8 characters
+   - Display requirement to users before submission
+   - Show error message from API if validation fails
 
-## 7. Validation Rules
+2. **Pagination UI**
+   - Add pagination controls to all listing pages
+   - Display page numbers, total pages, and total count
+   - Implement "Load More" or page navigation
 
-- **Username:** 3-30 characters, letters/numbers/underscores only
-- **Password:** Minimum 6 characters
-- **Email:** Standard email format (optional)
-- **Phone:** E.164 format (e.g., `+1234567890`)
-- **Image Upload:** Max 5MB, images only (jpeg, png, gif, webp)
-- **Category Name:** Required, must be unique
+3. **Order Sorting**
+   - Add sorting dropdown/buttons to order lists
+   - Default to "date" sorting
+   - Update UI when sort order changes
 
----
+4. **Order Display**
+   - Ensure status and date fields are displayed
+   - Format dates appropriately for user's locale
+   - Show order status with appropriate styling/colors
 
-## 8. Example Frontend Code
+### Optional Enhancements
 
-### Register
-```javascript
-const register = async (userData) => {
-  const res = await fetch('http://localhost:3000/api/v1/auth/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username: userData.username,
-      email: userData.email,
-      password: userData.password,
-      phoneNumber: userData.phoneNumber
-    })
-  });
-  return res.json();
-};
-```
+1. **Case Insensitive Login**
+   - Consider normalizing username/email input to lowercase for consistency
+   - Show helpful message that login is case-insensitive
 
-### Login
-```javascript
-const login = async (username, password) => {
-  const res = await fetch('http://localhost:3000/api/v1/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const data = await res.json();
-  localStorage.setItem('token', data.token);
-  return data;
-};
-```
-
-### Upload Image (Admin)
-```javascript
-const uploadImage = async (file, token) => {
-  const formData = new FormData();
-  formData.append('image', file);
-  
-  const res = await fetch('http://localhost:3000/api/v1/admin/upload/image', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    },
-    body: formData
-  });
-  return res.json();
-};
-```
-
-### Create Category (Admin)
-```javascript
-const createCategory = async (categoryData, token) => {
-  const res = await fetch('http://localhost:3000/api/v1/admin/categories', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name: categoryData.name,
-      description: categoryData.description
-    })
-  });
-  return res.json();
-};
-```
-
-### Get All Categories (Admin)
-```javascript
-const getCategories = async (token) => {
-  const res = await fetch('http://localhost:3000/api/v1/admin/categories', {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-  return res.json();
-};
-```
-
-### Update Category (Admin)
-```javascript
-const updateCategory = async (categoryId, updates, token) => {
-  const res = await fetch(`http://localhost:3000/api/v1/admin/categories/${categoryId}`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(updates)
-  });
-  return res.json();
-};
-```
-
-### Delete Category (Admin)
-```javascript
-const deleteCategory = async (categoryId, token) => {
-  const res = await fetch(`http://localhost:3000/api/v1/admin/categories/${categoryId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-  return res.json();
-};
-```
-
-### Create Product with Image (Admin)
-```javascript
-const createProduct = async (productData, imageFile, token) => {
-  // 1. Upload image first
-  const uploadRes = await uploadImage(imageFile, token);
-  const imageUrl = uploadRes.url;
-  
-  // 2. Create product with image URL
-  const res = await fetch('http://localhost:3000/api/v1/admin/products', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      ...productData,
-      imageUrl
-    })
-  });
-  return res.json();
-};
-```
+2. **Pagination Defaults**
+   - Use reasonable defaults (page: 1, limit: 20)
+   - Allow users to change items per page
+   - Remember user's preference if possible
 
 ---
 
-## 9. Breaking Changes
+## Summary of Breaking Changes
 
-⚠️ **Must Update:**
-- Login form: Change from phone/OTP to username/password
-- Registration: Add username, password, email fields
-- User state: Update to include `username`, `email`, `phoneVerified`
-- JWT handling: Token now has `username` instead of `phoneNumber`
-- Product creation: Now requires image upload step first (for admin)
-- **NEW:** Add category management UI for admin
+⚠️ **None** - All changes are backward compatible. Existing API calls will continue to work with default values.
 
----
+### New Optional Parameters
+- All pagination parameters are optional (defaults provided)
+- Sorting parameter is optional (defaults to "date")
+- Existing requests without these parameters will work as before
 
-## 10. New Features Summary
-
-✅ Username/Password authentication  
-✅ Phone verification (optional)  
-✅ Supabase image uploads  
-✅ **Category CRUD operations (Admin)**  
-✅ Product management with images  
+### Response Format Changes
+- Paginated endpoints now include `pagination` object in response
+- Order responses explicitly include `status`, `createdAt`, `updatedAt` (were already included, now guaranteed)
 
 ---
 
-**Base URL:** `http://localhost:3000/api/v1`  
-**All endpoints require:** `Content-Type: application/json` header (except image upload which uses `multipart/form-data`)
+## Testing Checklist
+
+- [ ] Test login with different case combinations
+- [ ] Test password validation with various invalid passwords
+- [ ] Test pagination on products list
+- [ ] Test pagination on orders list
+- [ ] Test sorting on orders (date, status, amount)
+- [ ] Verify order responses include status and date fields
+- [ ] Test pagination edge cases (page 0, negative numbers, etc.)
+- [ ] Verify error messages are displayed correctly

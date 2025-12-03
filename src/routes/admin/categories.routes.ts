@@ -13,23 +13,56 @@ router.use(requireAdmin);
 
 // POST /api/v1/admin/categories
 router.post('/',
-  async (_req: Request, res: Response) => {
+  [
+    body('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    body('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100')
+  ],
+  async (req: Request<{}, {}, { page?: number; limit?: number }>, res: Response) => {
+    const { page = 1, limit = 20 } = req.body;
     try {
-      const categories = await prisma.category.findMany({
-        include: {
-          _count: {
-            select: {
-              products: true
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
+
+      // Calculate pagination
+      const skip = (Number(page) - 1) * Number(limit);
+      const take = Number(limit);
+
+      const [categories, totalCount] = await Promise.all([
+        prisma.category.findMany({
+          include: {
+            _count: {
+              select: {
+                products: true
+              }
             }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          skip,
+          take
+        }),
+        prisma.category.count()
+      ]);
+
+      logger.debug('Categories retrieved', {
+        count: categories.length,
+        page,
+        limit,
+        totalCount
+      });
+      res.json({
+        categories,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          totalCount,
+          totalPages: Math.ceil(totalCount / Number(limit))
         }
       });
-
-      logger.debug('Categories retrieved', { count: categories.length });
-      res.json({ categories });
     } catch (error) {
       logger.error('Get categories error', {
         error: error instanceof Error ? error.message : 'Unknown error',

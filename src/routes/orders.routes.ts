@@ -85,8 +85,16 @@ router.post('/',
               include: {
                 product: true
               }
+            },
+            payment: {
+              select: {
+                id: true,
+                status: true,
+                transactionId: true
+              }
             }
           }
+          // Note: status and createdAt are included by default with include
         });
 
         // If payment method is CARD, create pending payment record
@@ -124,47 +132,90 @@ router.post('/',
 );
 
 // POST /api/v1/orders/my
-router.post('/my', async (req: Request, res: Response) => {
-  if (!req.user) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
+router.post('/my',
+  [
+    body('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    body('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    body('sortBy').optional().isIn(['date', 'status', 'amount']).withMessage('sortBy must be date, status, or amount')
+  ],
+  async (req: Request, res: Response) => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
-  const userId = req.user.userId;
-  try {
+    const userId = req.user.userId;
+    const { page = 1, limit = 20, sortBy = 'date' } = req.body;
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        res.status(400).json({ errors: errors.array() });
+        return;
+      }
 
-    const orders = await prisma.order.findMany({
-      where: { userId },
-      include: {
-        orderItems: {
+      // Calculate pagination
+      const skip = (Number(page) - 1) * Number(limit);
+      const take = Number(limit);
+
+      // Determine sort order
+      let orderBy: any = { createdAt: 'desc' };
+      if (sortBy === 'date') {
+        orderBy = { createdAt: 'desc' };
+      } else if (sortBy === 'status') {
+        orderBy = { status: 'asc' };
+      } else if (sortBy === 'amount') {
+        orderBy = { totalAmount: 'desc' };
+      }
+
+      const [orders, totalCount] = await Promise.all([
+        prisma.order.findMany({
+          where: { userId },
           include: {
-            product: {
+            orderItems: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    imageUrl: true
+                  }
+                }
+              }
+            },
+            payment: {
               select: {
                 id: true,
-                name: true,
-                imageUrl: true
+                status: true,
+                transactionId: true
               }
             }
-          }
-        },
-        payment: {
-          select: {
-            id: true,
-            status: true,
-            transactionId: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+          },
+          orderBy,
+          skip,
+          take
+        }),
+        prisma.order.count({
+          where: { userId }
+        })
+      ]);
 
     logger.debug('User orders retrieved', {
       userId,
-      orderCount: orders.length
+      orderCount: orders.length,
+      page,
+      limit,
+      sortBy,
+      totalCount
     });
-    res.json({ orders });
+    res.json({
+      orders,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        totalCount,
+        totalPages: Math.ceil(totalCount / Number(limit))
+      }
+    });
   } catch (error) {
     logger.error('Get orders error', {
       userId,

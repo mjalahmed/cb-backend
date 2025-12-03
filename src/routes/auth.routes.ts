@@ -4,7 +4,7 @@ import { prisma } from '../index.js';
 import { sendOTP } from '../services/twilio.service.js';
 import { verifyOTP } from '../utils/otp.util.js';
 import { generateToken } from '../utils/jwt.util.js';
-import { hashPassword, comparePassword } from '../utils/password.util.js';
+import { hashPassword, comparePassword, validateStrongPassword } from '../utils/password.util.js';
 import type { RegisterRequest, LoginRequest, SendOTPRequest, VerifyPhoneRequest } from '../types/index.js';
 import logger from '../utils/logger.js';
 
@@ -26,9 +26,7 @@ router.post('/register',
       .withMessage('Invalid email format'),
     body('password')
       .notEmpty()
-      .withMessage('Password is required')
-      .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters'),
+      .withMessage('Password is required'),
     body('phoneNumber')
       .notEmpty()
       .withMessage('Phone number is required')
@@ -45,23 +43,35 @@ router.post('/register',
 
       const { username, email, password, phoneNumber } = req.body;
 
-      // Check if username already exists
+      // Validate strong password
+      const passwordValidation = validateStrongPassword(password);
+      if (!passwordValidation.valid) {
+        res.status(400).json({ error: passwordValidation.error });
+        return;
+      }
+
+      // Normalize username and email to lowercase for case-insensitive comparison
+      const normalizedUsername = username.toLowerCase();
+      const normalizedEmail = email ? email.toLowerCase() : null;
+
+      // Check if username, email, or phone number already exists
+      // Since we store in lowercase, we can query directly
       const existingUser = await prisma.user.findFirst({
         where: {
           OR: [
-            { username },
-            ...(email ? [{ email }] : []),
+            { username: normalizedUsername },
+            ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
             { phoneNumber }
           ]
         }
       });
 
       if (existingUser) {
-        if (existingUser.username === username) {
+        if (existingUser.username.toLowerCase() === normalizedUsername) {
           res.status(400).json({ error: 'Username already taken' });
           return;
         }
-        if (email && existingUser.email === email) {
+        if (normalizedEmail && existingUser.email?.toLowerCase() === normalizedEmail) {
           res.status(400).json({ error: 'Email already registered' });
           return;
         }
@@ -75,10 +85,11 @@ router.post('/register',
       const hashedPassword = await hashPassword(password);
 
       // Create user (phone not verified yet)
+      // Store username and email in lowercase for consistency
       const user = await prisma.user.create({
         data: {
-          username,
-          email: email || null,
+          username: normalizedUsername,
+          email: normalizedEmail,
           password: hashedPassword,
           phoneNumber,
           phoneVerified: false,
@@ -138,9 +149,17 @@ router.post('/login',
 
       const { username, password } = req.body;
 
-      // Find user by username
-      const user = await prisma.user.findUnique({
-        where: { username }
+      // Normalize username/email to lowercase for case-insensitive lookup
+      const normalizedUsername = username.toLowerCase();
+
+      // Find user by username or email (stored in lowercase)
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { username: normalizedUsername },
+            { email: normalizedUsername }
+          ]
+        }
       });
 
       if (!user) {

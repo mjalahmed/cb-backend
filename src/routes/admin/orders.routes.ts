@@ -14,10 +14,13 @@ router.use(requireAdmin);
 // POST /api/v1/admin/orders
 router.post('/',
   [
-    body('status').optional().isIn(['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'])
+    body('status').optional().isIn(['PENDING', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']),
+    body('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    body('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    body('sortBy').optional().isIn(['date', 'status', 'amount']).withMessage('sortBy must be date, status, or amount')
   ],
-  async (req: Request<{}, {}, { status?: string }>, res: Response) => {
-    const { status } = req.body;
+  async (req: Request<{}, {}, { status?: string; page?: number; limit?: number; sortBy?: string }>, res: Response) => {
+    const { status, page = 1, limit = 20, sortBy = 'date' } = req.body;
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -30,44 +33,81 @@ router.post('/',
         where.status = status as OrderStatus;
       }
 
-      const orders = await prisma.order.findMany({
-        where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              phoneNumber: true
-            }
-          },
-          orderItems: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                  imageUrl: true
+      // Calculate pagination
+      const skip = (Number(page) - 1) * Number(limit);
+      const take = Number(limit);
+
+      // Determine sort order
+      let orderBy: any = { createdAt: 'desc' };
+      if (sortBy === 'date') {
+        orderBy = { createdAt: 'desc' };
+      } else if (sortBy === 'status') {
+        orderBy = { status: 'asc' };
+      } else if (sortBy === 'amount') {
+        orderBy = { totalAmount: 'desc' };
+      }
+
+      const [orders, totalCount] = await Promise.all([
+        prisma.order.findMany({
+          where,
+          select: {
+            id: true,
+            userId: true,
+            totalAmount: true,
+            status: true, // Explicitly include status
+            orderType: true,
+            scheduledTime: true,
+            createdAt: true, // Explicitly include date
+            updatedAt: true,
+            user: {
+              select: {
+                id: true,
+                phoneNumber: true
+              }
+            },
+            orderItems: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    imageUrl: true
+                  }
                 }
+              }
+            },
+            payment: {
+              select: {
+                id: true,
+                status: true,
+                transactionId: true
               }
             }
           },
-          payment: {
-            select: {
-              id: true,
-              status: true,
-              transactionId: true
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
+          orderBy,
+          skip,
+          take
+        }),
+        prisma.order.count({ where })
+      ]);
 
       logger.debug('Admin orders retrieved', {
         status,
-        count: orders.length
+        count: orders.length,
+        page,
+        limit,
+        sortBy,
+        totalCount
       });
-      res.json({ orders });
+      res.json({
+        orders,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          totalCount,
+          totalPages: Math.ceil(totalCount / Number(limit))
+        }
+      });
     } catch (error) {
       logger.error('Get orders error', {
         status,

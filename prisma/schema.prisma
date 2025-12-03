@@ -61,19 +61,34 @@ model Category {
 }
 
 model Product {
-  id          String    @id @default(uuid())
+  id          String         @id @default(uuid())
   name        String
   description String?
-  price       Decimal   @db.Decimal(10, 2)
+  price       Decimal        @db.Decimal(10, 2)
   imageUrl    String?
-  isAvailable Boolean   @default(true)
+  isAvailable Boolean        @default(true)
   categoryId  String
-  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  category    Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
   orderItems  OrderItem[]
+  translations ProductTranslation[]
 
   @@map("products")
+}
+
+model ProductTranslation {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  languageCode String   // e.g., 'en', 'ar', 'fr'
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId, languageCode])
+  @@map("product_translations")
 }
 
 model Order {
